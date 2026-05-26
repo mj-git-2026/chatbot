@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Q&A 관리 - 시스템 지원 챗봇</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #10b981;
+      --danger: #ef4444;
+      --bg: #f1f5f9;
+      --white: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --radius: 10px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0,0,0,.15);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-icon {
+      width: 38px; height: 38px; background: rgba(255,255,255,.2);
+      border-radius: 9px; display: flex; align-items: center;
+      justify-content: center; font-size: 18px;
+    }
+    header h1 { font-size: 18px; font-weight: 700; }
+    header p  { font-size: 12px; opacity: .75; margin-top: 2px; }
+    .chat-link {
+      background: rgba(255,255,255,.15); color: #fff;
+      border: 1px solid rgba(255,255,255,.3);
+      padding: 7px 14px; border-radius: 8px;
+      text-decoration: none; font-size: 13px; transition: background .2s;
+    }
+    .chat-link:hover { background: rgba(255,255,255,.25); }
+
+    /* ── Main ── */
+    main { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+
+    /* ── Stats cards ── */
+    .stats { display: flex; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
+    .stat-card {
+      background: var(--white); border-radius: var(--radius);
+      padding: 18px 24px; flex: 1; min-width: 150px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      display: flex; align-items: center; gap: 14px;
+    }
+    .stat-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
+    }
+    .stat-icon.blue   { background: #dbeafe; }
+    .stat-icon.green  { background: #d1fae5; }
+    .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 2px; }
+    .stat-value { font-size: 24px; font-weight: 700; color: var(--text); }
+
+    /* ── Section card ── */
+    .card {
+      background: var(--white); border-radius: var(--radius);
+      box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 24px;
+    }
+    .card-header {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; user-select: none;
+    }
+    .card-header h2 { font-size: 15px; font-weight: 700; }
+    .card-header .toggle-icon { font-size: 13px; color: var(--text-muted); transition: transform .2s; }
+    .card-header.open .toggle-icon { transform: rotate(180deg); }
+    .card-body { padding: 20px; }
+    .card-body.hidden { display: none; }
+
+    /* ── Form ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .form-grid .span2 { grid-column: span 2; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: var(--text-muted); }
+    input[type=text], textarea, select {
+      width: 100%; padding: 9px 12px; border: 1.5px solid var(--border);
+      border-radius: 8px; font-size: 14px; font-family: inherit;
+      color: var(--text); background: var(--bg);
+      transition: border-color .2s; outline: none;
+    }
+    input[type=text]:focus, textarea:focus, select:focus { border-color: var(--primary); background: #fff; }
+    textarea { resize: vertical; min-height: 90px; }
+    .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 9px 20px; border-radius: 8px; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      font-family: inherit; transition: background .2s, transform .1s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-secondary { background: var(--bg); color: var(--text-muted); border: 1.5px solid var(--border); }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+    .btn-edit  { background: #dbeafe; color: var(--primary); }
+    .btn-edit:hover  { background: #bfdbfe; }
+    .btn-del   { background: #fee2e2; color: var(--danger); }
+    .btn-del:hover   { background: #fecaca; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex; gap: 10px; padding: 14px 20px;
+      border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center;
+    }
+    .search-wrap { position: relative; flex: 1; min-width: 180px; }
+    .search-wrap input { padding-left: 34px; background: var(--bg); }
+    .search-icon {
+      position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+      color: var(--text-muted); font-size: 14px; pointer-events: none;
+    }
+    .filter-select { width: auto; min-width: 120px; }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th {
+      background: var(--bg); padding: 11px 14px;
+      text-align: left; font-size: 12px; font-weight: 700;
+      color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em;
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+    .q-cell { max-width: 320px; }
+    .q-text {
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 320px; display: block;
+    }
+    .badge {
+      display: inline-block; padding: 2px 9px; border-radius: 20px;
+      font-size: 11px; font-weight: 700;
+      background: #dbeafe; color: var(--primary);
+    }
+    .actions { display: flex; gap: 6px; white-space: nowrap; }
+    .empty-row td { text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; }
+
+    /* ── Modal ── */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200; padding: 20px;
+    }
+    .overlay.hidden { display: none; }
+    .modal {
+      background: var(--white); border-radius: 14px;
+      width: 100%; max-width: 620px; max-height: 90vh;
+      overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    }
+    .modal-header {
+      padding: 18px 22px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: #fff; border-radius: 14px 14px 0 0;
+    }
+    .modal-header h2 { font-size: 16px; font-weight: 700; }
+    .modal-close {
+      background: none; border: none; font-size: 20px;
+      cursor: pointer; color: var(--text-muted); line-height: 1;
+      padding: 4px 8px; border-radius: 6px;
+    }
+    .modal-close:hover { background: var(--bg); }
+    .modal-body { padding: 22px; }
+    .modal-footer { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 28px; right: 24px;
+      background: #1e293b; color: #fff;
+      padding: 12px 20px; border-radius: 10px; font-size: 14px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.25);
+      opacity: 0; pointer-events: none;
+      transition: opacity .3s; z-index: 300;
+    }
+    #toast.show { opacity: 1; pointer-events: auto; }
+    #toast.success { background: var(--success); }
+    #toast.error   { background: var(--danger); }
+
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .form-grid .span2 { grid-column: span 1; }
+      .stats { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="header-icon">⚙️</div>
+    <div>
+      <h1>Q&A 관리</h1>
+      <p>시스템 문의 데이터 관리</p>
+    </div>
+  </div>
+  <a href="/" class="chat-link">💬 챗봇으로 이동</a>
+</header>
+
+<main>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-icon blue">📋</div>
+      <div><div class="stat-label">전체 Q&A</div><div class="stat-value" id="statTotal">-</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon green">🗂️</div>
+      <div><div class="stat-label">카테고리 수</div><div class="stat-value" id="statCats">-</div></div>
+    </div>
+  </div>
+
+  <!-- Add Form -->
+  <div class="card">
+    <div class="card-header open" id="addToggle" onclick="toggleAdd()">
+      <h2>➕ 새 Q&A 등록</h2>
+      <span class="toggle-icon">▼</span>
+    </div>
+    <div class="card-body" id="addBody">
+      <form id="addForm" onsubmit="addQA(event)">
+        <div class="form-grid">
+          <div>
+            <label>카테고리</label>
+            <input type="text" name="category" list="catList" placeholder="예: 로그인, 오류, 네트워크" value="일반">
+            <datalist id="catList"></datalist>
+          </div>
+          <div>
+            <label>키워드 <span style="font-weight:400;font-size:11px">(쉼표로 구분, 선택)</span></label>
+            <input type="text" name="keywords" placeholder="예: 비밀번호, 로그인, 접속오류">
+          </div>
+          <div class="span2">
+            <label>질문 *</label>
+            <textarea name="question" placeholder="사용자가 자주 묻는 질문을 입력하세요" required></textarea>
+          </div>
+          <div class="span2">
+            <label>답변 (조치 가이드) *</label>
+            <textarea name="answer" style="min-height:120px"
+              placeholder="단계별 조치 방법 또는 해결 가이드를 입력하세요" required></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="reset" class="btn btn-secondary">초기화</button>
+          <button type="submit" class="btn btn-primary">등록하기</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="질문 또는 답변 검색..."
+               oninput="onSearch()" autocomplete="off">
+      </div>
+      <select class="filter-select" id="catFilter" onchange="onFilter()">
+        <option value="">전체 카테고리</option>
+      </select>
+      <span id="countLabel" style="font-size:13px;color:var(--text-muted);white-space:nowrap"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:50px">ID</th>
+            <th style="width:110px">카테고리</th>
+            <th>질문</th>
+            <th style="width:120px">등록일</th>
+            <th style="width:110px">액션</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<!-- Edit Modal -->
+<div class="overlay hidden" id="editOverlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Q&A 수정</h2>
+      <button class="modal-close" onclick="closeEdit()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="editForm" onsubmit="saveEdit(event)">
+        <input type="hidden" name="id">
+        <div class="form-grid">
+          <div>
+            <label>카테고리</label>
+            <input type="text" name="category" list="catList">
+          </div>
+          <div>
+            <label>키워드</label>
+            <input type="text" name="keywords">
+          </div>
+          <div class="span2">
+            <label>질문 *</label>
+            <textarea name="question" required></textarea>
+          </div>
+          <div class="span2">
+            <label>답변 (조치 가이드) *</label>
+            <textarea name="answer" style="min-height:140px" required></textarea>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeEdit()">취소</button>
+      <button class="btn btn-primary" onclick="document.getElementById('editForm').requestSubmit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  let allData = [];
+  let searchTimer = null;
+
+  /* ── Init ── */
+  async function init() {
+    await Promise.all([loadStats(), loadCategories(), loadData()]);
+  }
+
+  async function loadStats() {
+    try {
+      const s = await fetch('/api/stats').then(r => r.json());
+      document.getElementById('statTotal').textContent = s.total;
+      document.getElementById('statCats').textContent  = s.category_count;
+    } catch (_) {}
+  }
+
+  async function loadCategories() {
+    try {
+      const cats = await fetch('/api/categories').then(r => r.json());
+      const sel = document.getElementById('catFilter');
+      const dl  = document.getElementById('catList');
+      // Keep "전체" option
+      sel.querySelectorAll('option:not([value=""])').forEach(o => o.remove());
+      dl.innerHTML = '';
+      cats.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c; o.textContent = c;
+        sel.appendChild(o.cloneNode(true));
+        dl.appendChild(o);
+      });
+    } catch (_) {}
+  }
+
+  async function loadData(category = '', search = '') {
+    const params = new URLSearchParams();
+    if (category) params.set('category', category);
+    if (search)   params.set('search', search);
+    try {
+      allData = await fetch('/api/qa?' + params).then(r => r.json());
+      renderTable(allData);
+    } catch (_) { toast('데이터 로드 실패', 'error'); }
+  }
+
+  /* ── Render ── */
+  function renderTable(data) {
+    const tbody = document.getElementById('tbody');
+    document.getElementById('countLabel').textContent = `총 ${data.length}건`;
+
+    if (!data.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="5">등록된 Q&A가 없습니다.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.map(qa => `
+      <tr>
+        <td style="color:var(--text-muted);font-size:13px">${qa.id}</td>
+        <td><span class="badge">${esc(qa.category)}</span></td>
+        <td class="q-cell"><span class="q-text" title="${esc(qa.question)}">${esc(qa.question)}</span></td>
+        <td style="font-size:13px;color:var(--text-muted)">${fmtDate(qa.created_at)}</td>
+        <td><div class="actions">
+          <button class="btn btn-sm btn-edit" onclick="openEdit(${qa.id})">수정</button>
+          <button class="btn btn-sm btn-del"  onclick="confirmDel(${qa.id}, '${esc(qa.question).slice(0,30)}')">삭제</button>
+        </div></td>
+      </tr>`).join('');
+  }
+
+  /* ── Search / Filter ── */
+  function onSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      loadData(document.getElementById('catFilter').value, document.getElementById('searchInput').value.trim());
+    }, 300);
+  }
+  function onFilter() {
+    loadData(document.getElementById('catFilter').value, document.getElementById('searchInput').value.trim());
+  }
+
+  /* ── Toggle add form ── */
+  function toggleAdd() {
+    const hdr  = document.getElementById('addToggle');
+    const body = document.getElementById('addBody');
+    hdr.classList.toggle('open');
+    body.classList.toggle('hidden');
+  }
+
+  /* ── Add ── */
+  async function addQA(e) {
+    e.preventDefault();
+    const f = e.target;
+    const payload = {
+      category: f.category.value.trim() || '일반',
+      question: f.question.value.trim(),
+      answer:   f.answer.value.trim(),
+      keywords: f.keywords.value.trim(),
+    };
+    try {
+      const res = await fetch('/api/qa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        toast('Q&A가 등록되었습니다', 'success');
+        f.reset();
+        await Promise.all([loadStats(), loadCategories(), loadData()]);
+      } else {
+        const err = await res.json();
+        toast(err.detail ?? '등록 실패', 'error');
+      }
+    } catch (_) { toast('오류가 발생했습니다', 'error'); }
+  }
+
+  /* ── Edit ── */
+  function openEdit(id) {
+    const qa = allData.find(q => q.id === id);
+    if (!qa) return;
+    const f = document.getElementById('editForm');
+    f.id_.value       = qa.id;        // hidden
+    f.category.value  = qa.category;
+    f.keywords.value  = qa.keywords;
+    f.question.value  = qa.question;
+    f.answer.value    = qa.answer;
+    document.getElementById('editOverlay').classList.remove('hidden');
+  }
+  // Give hidden input a name that doesn't conflict
+  document.querySelector('#editForm input[type=hidden]').name = 'id_';
+
+  function closeEdit() {
+    document.getElementById('editOverlay').classList.add('hidden');
+  }
+  function closeModal(e) {
+    if (e.target === document.getElementById('editOverlay')) closeEdit();
+  }
+
+  async function saveEdit(e) {
+    e.preventDefault();
+    const f = e.target;
+    const id = parseInt(f.id_.value);
+    const payload = {
+      category: f.category.value.trim() || '일반',
+      question: f.question.value.trim(),
+      answer:   f.answer.value.trim(),
+      keywords: f.keywords.value.trim(),
+    };
+    try {
+      const res = await fetch(`/api/qa/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        toast('수정되었습니다', 'success');
+        closeEdit();
+        await Promise.all([loadStats(), loadCategories(), loadData()]);
+      } else {
+        const err = await res.json();
+        toast(err.detail ?? '수정 실패', 'error');
+      }
+    } catch (_) { toast('오류가 발생했습니다', 'error'); }
+  }
+
+  /* ── Delete ── */
+  async function confirmDel(id, preview) {
+    if (!confirm(`"${preview}..." Q&A를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+    try {
+      const res = await fetch(`/api/qa/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast('삭제되었습니다', 'success');
+        await Promise.all([loadStats(), loadCategories(), loadData()]);
+      } else {
+        const err = await res.json();
+        toast(err.detail ?? '삭제 실패', 'error');
+      }
+    } catch (_) { toast('오류가 발생했습니다', 'error'); }
+  }
+
+  /* ── Helpers ── */
+  function esc(s) {
+    const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML;
+  }
+  function fmtDate(s) {
+    if (!s) return '-';
+    return new Date(s).toLocaleDateString('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit' });
+  }
+
+  let toastTimer;
+  function toast(msg, type = '') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `show ${type}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+  }
+
+  init();
+</script>
+</body>
+</html>
